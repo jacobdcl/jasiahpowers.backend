@@ -1,106 +1,43 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Container, Modal } from '@mui/material';
-import { Masonry } from '@mui/lab';
-import { Image } from 'cloudinary-react';
-import LazyLoad from 'react-lazyload';
-import axios from 'axios';
-import LoadingPage from '../LoadingPage/LoadingPage.jsx'; 
+require('dotenv').config();
+const cloudinary = require('cloudinary').v2;
+const PORT = process.env.PORT || 5001;
+const express = require('express');
+const path = require('path');
+const app = express();
 
-function PhotosPage() {
-  const [open, setOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [items, setItems] = useState([]);
+const cors = require('cors');
+app.use(cors());
 
-  const handleOpen = (imageUrl) => {
-    console.log("Opening modal with image:", imageUrl); // Diagnostic log
-    setSelectedItem(imageUrl);
-    setOpen(true);
-  };
-  
-  const [loading, setLoading] = useState(true);
+// Cloudinary configuration
+cloudinary.config({ 
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
+  api_key: process.env.CLOUDINARY_API_KEY, 
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true
+});
 
-  useEffect(() => {
-    const fetchImages = async () => {
-      setLoading(true); // Set loading to true when the request starts
-      try {
-        const response = await axios.get('CYCLIC_URL/api/images');
-        if (response.data && Array.isArray(response.data.images)) {
-          setItems(response.data.images);
-        } else {
-          console.error('Invalid data structure:', response.data);
-          setItems([]); // Fallback to an empty array
-        }
-      } catch (error) {
+app.get('/health', (req, res) => {
+    res.send('OK');
+  });  
+
+app.use(express.json());
+
+app.get('/api/images', async (req, res) => {
+    try {
+        let result = await cloudinary.search
+            .expression('folder:jasiahpowers') // Update the folder path if necessary
+            .sort_by('public_id', 'desc')
+            .max_results(100)
+            .execute();
+
+        let imageUrls = result.resources.map(file => file.secure_url);
+        res.json({ images: imageUrls });
+    } catch (error) {
         console.error('Error fetching images:', error);
-      }
-      setLoading(false); // Set loading to false when the request ends
+        res.status(500).send('Error fetching images');
+    }
+});
 
-    };
-    fetchImages();
-  }, []);
-
-  if (loading) {
-    return <LoadingPage/>;
-  }
-
-  const handleClose = () => {
-    setOpen(false);
-  };
-
-  return (
-    <Container maxWidth="lg" sx={{ paddingTop: '10vh', paddingBottom: '5vh', textAlign: 'center' }}>
-      <Masonry columns={{ xs: 2, sm: 3, md: 4, lg: 5 }} spacing={0.6}>
-      {items.map((imagePublicId, index) => (
-        <LazyLoad key={index} height={200} offset={100}>
-          <Box
-            sx={{
-              display: 'block',
-              width: 1,
-              cursor: 'pointer',
-              '&:hover': {
-                opacity: 0.8,
-              },
-            }}
-            onClick={() => handleOpen(imagePublicId)}
-          >
-            <Image 
-              cloudName={import.meta.env.VITE_CLOUDINARY_CLOUD_NAME} 
-              publicId={imagePublicId} 
-              width="300" 
-              crop="scale"
-              style={{ width: '100%' }} 
-            />
-          </Box>
-        </LazyLoad>
-      ))}
-      </Masonry>
-       {/*}
-        <Modal
-          open={open}
-          onClose={handleClose}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Image 
-            cloudName={import.meta.env.VITE_CLOUDINARY_CLOUD_NAME} 
-            publicId={selectedItem} // used to be publicId
-            style={{
-              outline: 'none',
-              maxWidth: '90%',
-              maxHeight: '90%',
-              boxShadow: 24,
-              borderRadius: 2,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            }} 
-            crop="scale"
-          />
-        </Modal>
-          */}
-    </Container>
-  );
-}
-
-export default PhotosPage;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
