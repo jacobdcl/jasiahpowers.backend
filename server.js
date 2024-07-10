@@ -1,43 +1,38 @@
-require('dotenv').config();
-const cloudinary = require('cloudinary').v2;
-const PORT = process.env.PORT || 5001;
-const express = require('express');
-const path = require('path');
+require("dotenv").config();
+const cloudinary = require("cloudinary").v2;
+const express = require("express");
+const cors = require("cors");
 const app = express();
+const PORT = process.env.PORT || 5001;
 
-const cors = require('cors');
+app.use(express.json());
 app.use(cors());
 
 // Cloudinary configuration
-cloudinary.config({ 
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
-  api_key: process.env.CLOUDINARY_API_KEY, 
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true
+cloudinary.config({
+  cloud_name: process.env.VITE_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.VITE_CLOUDINARY_API_KEY,
+  api_secret: process.env.VITE_CLOUDINARY_API_SECRET,
 });
 
-app.get('/health', (req, res) => {
-    res.send('OK');
-  });  
+// API route to fetch images from a specific folder in Cloudinary
+app.get("/api/images/:folder", async (req, res) => {
+  try {
+    const folderPath = `jasiahpowers/${req.params.folder}`; // Use the folder parameter to get the specific folder
+    const { resources } = await cloudinary.search
+      .expression(`folder:${folderPath}`)
+      .sort_by("public_id", "desc")
+      .max_results(30)
+      .execute();
 
-app.use(express.json());
-
-app.get('/api/images', async (req, res) => {
-    try {
-        let result = await cloudinary.search
-            .expression('folder:jasiahpowers') // Update the folder path if necessary
-            .sort_by('public_id', 'desc')
-            .max_results(100)
-            .execute();
-
-        let imageUrls = result.resources.map(file => file.secure_url);
-        res.json({ images: imageUrls });
-    } catch (error) {
-        console.error('Error fetching images:', error);
-        res.status(500).send('Error fetching images');
-    }
+    const imagePublicIds = resources.map((file) => file.public_id);
+    res.json({ images: imagePublicIds });
+  } catch (error) {
+    console.error("Error fetching images:", error);
+    res.status(500).send("Error fetching images");
+  }
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
